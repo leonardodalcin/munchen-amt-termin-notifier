@@ -1,0 +1,1 @@
+# munchen-amt-termin-notifier
