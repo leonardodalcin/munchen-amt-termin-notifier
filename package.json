@@ -1,0 +1,11 @@
+{
+  "name": "munchen-fuhrerschein-umschreiben-termin-notifier",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "cypress run",
+    "dev": "cypress open"
+  },
+  "dependencies": {
+    "cypress": "latest"
+  }
+}
