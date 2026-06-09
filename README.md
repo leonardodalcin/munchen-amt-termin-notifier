@@ -8,8 +8,10 @@ notifies you when a slot opens up — Führerschein, Einbürgerung, immigration
 
 Munich uses the Berlin **ZMS ("Bürgeransicht")** system. This project queries its
 JSON API directly with a small, strictly-typed [Bun](https://bun.sh) client — no
-browser, no scraping. A scheduled GitHub Action checks every service in
-[`watchlist.ts`](./libs/watchlist.ts) every 5 minutes (one matrix job each).
+browser, no scraping. The scheduled GitHub Action checks the **immigration
+service** (_Notfall-Hilfe Aufenthaltstitel_) every 5 minutes; use the manual
+**Run workflow** dropdown to check Führerschein, Einbürgerung, or all of
+[`watchlist.ts`](./libs/watchlist.ts).
 
 ## Layout
 
@@ -73,15 +75,14 @@ The workflow has a **Run workflow** button (`workflow_dispatch`) with a dropdown
 to pick `all` or a single service. The dropdown options live in the workflow
 (GitHub requires static choices) — keep them in sync with `libs/watchlist.ts`.
 
-## Captcha-gated services (immigration) ⚠️
+## Captcha-gated services (immigration)
 
 High-demand services (e.g. _Notfall-Hilfe Aufenthaltstitel_) are protected by an
-**Altcha** proof-of-work captcha. The client solves it automatically, **but** the
-captcha is verified against `captcha-prod.muenchen.de`, which only resolves
-**inside Germany**. To poll those from GitHub's runners, route through a German
-proxy: stand up a small AWS Lightsail instance and add the repo secret
-**`PROXY_URL`** — see **[docs/german-proxy.md](./docs/german-proxy.md)**. The
-proxy is applied only to services marked `"captcha": true`.
+**Altcha** proof-of-work captcha. The client solves it automatically via the
+public `captcha-challenge` / `captcha-verify` endpoints (solve the proof-of-work,
+exchange it for a token, pass that to `available-days`) — **this works from
+anywhere, no proxy or German egress required.** Services marked `"captcha": true`
+in the watch-list are just documentation; detection is automatic.
 
 ## Develop
 
