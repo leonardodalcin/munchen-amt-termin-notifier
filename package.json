@@ -1,11 +1,13 @@
 {
-  "name": "munchen-fuhrerschein-umschreiben-termin-notifier",
-  "version": "1.0.0",
+  "name": "munchen-amt-termin-notifier",
+  "version": "2.0.0",
+  "description": "Checks the City of Munich appointment system (Bürgeransicht / ZMS) for available slots and notifies when they open up.",
   "scripts": {
-    "start": "cypress run",
-    "dev": "cypress open"
+    "start": "bun check-appointments.js",
+    "check": "bun check-appointments.js"
   },
-  "dependencies": {
-    "cypress": "latest"
-  }
+  "engines": {
+    "bun": ">=1.0"
+  },
+  "license": "MIT"
 }
