@@ -13,24 +13,64 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  check:
+  # Type-check the TypeScript with tsc before doing anything else.
+  typecheck:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Cache Bun packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: ${{ runner.os }}-bun-
+      - run: bun install --frozen-lockfile
+      - run: bun run typecheck
 
+  # Load the watch-list (services.json) into a matrix so each service is a job.
+  config:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.load.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - id: load
+        run: echo "matrix=$(bun -e 'process.stdout.write(JSON.stringify(require(\"./services.json\")))')" >> "$GITHUB_OUTPUT"
+
+  check:
+    needs: [typecheck, config]
+    runs-on: ubuntu-latest
+    strategy:
+      # One service finding a slot (and failing) must not cancel the others.
+      fail-fast: false
+      matrix:
+        service: ${{ fromJson(needs.config.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
-      - name: Check for available appointments
-        run: bun start
+      - name: Check ${{ matrix.service.name }}
+        run: bun check.ts
         env:
-          # Defaults target "Umschreibung eines ausländischen Führerscheins".
-          # Override here (or via repo variables) to watch a different service/office.
-          OFFICE_ID: ${{ vars.OFFICE_ID || '10308174' }}
-          SERVICE_ID: ${{ vars.SERVICE_ID || '1071896' }}
-          SERVICE_COUNT: ${{ vars.SERVICE_COUNT || '1' }}
-          DAYS_AHEAD: ${{ vars.DAYS_AHEAD || '90' }}
-          NOT_AFTER: ${{ vars.NOT_AFTER || '' }}
-          # When a slot is found the script exits non-zero -> this run is marked
-          # "failed" and GitHub emails you. That failure is the notification.
+          SERVICE_NAME: ${{ matrix.service.name }}
+          SERVICE_ID: ${{ matrix.service.serviceId }}
+          OFFICE_ID: ${{ matrix.service.officeId }}
+          SERVICE_COUNT: ${{ matrix.service.serviceCount || 1 }}
+          DAYS_AHEAD: ${{ matrix.service.daysAhead || vars.DAYS_AHEAD || '90' }}
+          NOT_AFTER: ${{ matrix.service.notAfter || '' }}
+          # German HTTP(S) proxy — only used for captcha-gated services (the
+          # captcha host is only resolvable from inside Germany). Non-captcha
+          # services run direct, so they keep working even if the proxy is down.
+          # Set as the repo secret PROXY_URL (see docs/german-proxy.md); it is
+          # passed to the client as MUC_PROXY_URL.
+          MUC_PROXY_URL: ${{ matrix.service.captcha && secrets.PROXY_URL || '' }}
+          # When a slot is found the job exits non-zero -> the run is marked
+          # "failed" and GitHub emails you. A red run here is good news.
