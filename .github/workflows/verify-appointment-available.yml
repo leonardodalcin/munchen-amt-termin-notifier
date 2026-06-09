@@ -73,10 +73,6 @@ jobs:
           SERVICE_COUNT: ${{ matrix.service.serviceCount || 1 }}
           DAYS_AHEAD: ${{ matrix.service.daysAhead || vars.DAYS_AHEAD || '90' }}
           NOT_AFTER: ${{ matrix.service.notAfter || '' }}
-          # German HTTP(S) proxy — only used for captcha-gated services (the
-          # captcha host is only resolvable from inside Germany). Non-captcha
-          # services run direct, so they keep working even if the proxy is down.
-          # Set as the repo secret PROXY_URL (see docs/german-proxy.md).
-          MUC_PROXY_URL: ${{ matrix.service.captcha && secrets.PROXY_URL || '' }}
           # When a slot is found the job exits non-zero -> the run is marked
           # "failed" and GitHub emails you. A red run here is good news.
+          # (Captcha-gated services are solved automatically — no proxy needed.)

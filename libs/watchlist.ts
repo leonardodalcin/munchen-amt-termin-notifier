@@ -15,7 +15,7 @@ interface WatchEntryBase {
   daysAhead?: number;
   /** Only alert on slots on/before this date, "YYYY-MM-DD". */
   notAfter?: string;
-  /** Set for captcha-gated services — routes the request through PROXY_URL in CI. */
+  /** Marks captcha-gated services (informational; the client detects + solves it automatically). */
   captcha?: boolean;
 }
 

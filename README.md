@@ -75,15 +75,14 @@ The workflow has a **Run workflow** button (`workflow_dispatch`) with a dropdown
 to pick `all` or a single service. The dropdown options live in the workflow
 (GitHub requires static choices) — keep them in sync with `libs/watchlist.ts`.
 
-## Captcha-gated services (immigration) ⚠️
+## Captcha-gated services (immigration)
 
 High-demand services (e.g. _Notfall-Hilfe Aufenthaltstitel_) are protected by an
-**Altcha** proof-of-work captcha. The client solves it automatically, **but** the
-captcha is verified against `captcha-prod.muenchen.de`, which only resolves
-**inside Germany**. To poll those from GitHub's runners, route through a German
-proxy: stand up a small AWS Lightsail instance and add the repo secret
-**`PROXY_URL`** — see **[docs/german-proxy.md](./docs/german-proxy.md)**. The
-proxy is applied only to services marked `"captcha": true`.
+**Altcha** proof-of-work captcha. The client solves it automatically via the
+public `captcha-challenge` / `captcha-verify` endpoints (solve the proof-of-work,
+exchange it for a token, pass that to `available-days`) — **this works from
+anywhere, no proxy or German egress required.** Services marked `"captcha": true`
+in the watch-list are just documentation; detection is automatic.
 
 ## Develop
 

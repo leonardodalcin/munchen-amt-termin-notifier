@@ -7,13 +7,11 @@
  *     getOfficesAndServices),
  *   - check available days for any service (getAvailableDays / availableDaysAuto),
  *   - transparently solve the Altcha proof-of-work captcha that gates the
- *     high-demand services (e.g. immigration / Aufenthaltstitel).
+ *     high-demand services (e.g. immigration / Aufenthaltstitel) via the public
+ *     www48 challenge/verify endpoints — works from anywhere, no proxy needed.
  *
- * Network egress:
- *   The captcha is verified against `captcha-prod.muenchen.de`, which is only
- *   resolvable from inside Germany. To poll captcha-gated services from
- *   elsewhere (e.g. GitHub Actions runners), route requests through a German
- *   HTTP(S) proxy/VPN by passing `proxy` (or setting MUC_PROXY_URL / HTTPS_PROXY).
+ * An optional `proxy` (or MUC_PROXY_URL / HTTPS_PROXY) is still honoured if you
+ * want to route requests through one, but it is not required.
  */
 
 import { createHash } from "node:crypto";
@@ -25,8 +23,6 @@ export const DEFAULT_BASE: string =
 export interface ClientOptions {
   baseUrl?: string;
   proxy?: string;
-  /** Body key used when POSTing the solved Altcha payload to the verify endpoint. */
-  captchaPayloadKey?: string;
   debug?: boolean;
 }
 
@@ -109,14 +105,11 @@ type FetchInit = RequestInit & { proxy?: string };
 export class MunichTerminClient {
   readonly baseUrl: string;
   readonly proxy: string | undefined;
-  readonly captchaPayloadKey: string;
   readonly debug: boolean;
 
   constructor(options: ClientOptions = {}) {
     this.baseUrl = (options.baseUrl ?? DEFAULT_BASE).replace(/\/+$/, "");
     this.proxy = options.proxy ?? process.env.MUC_PROXY_URL ?? process.env.HTTPS_PROXY ?? undefined;
-    this.captchaPayloadKey =
-      options.captchaPayloadKey ?? process.env.CAPTCHA_PAYLOAD_KEY ?? "payload";
     this.debug = options.debug ?? !!process.env.DEBUG;
   }
 
@@ -182,20 +175,16 @@ export class MunichTerminClient {
   }
 
   /*
-   * Solve the Altcha captcha and return a verified `captchaToken`, or null when
-   * the captcha is disabled. Flow mirrors the official altcha-widget:
-   *   1. GET challenge, 2. solve PoW, 3. POST the base64 solution to the verify
-   *   endpoint, 4. the response's `payload` is the token.
+   * Solve the Altcha captcha that gates high-demand services and return a
+   * `captchaToken` for `available-days`. The public www48 endpoints proxy the
+   * captcha for us, so this works from anywhere — no German egress required:
+   *   1. GET  /captcha-challenge/  -> Altcha challenge
+   *   2. solve the proof-of-work
+   *   3. POST /captcha-verify/ { payload } -> { token } (a signed JWT)
    */
-  async solveCaptcha(): Promise<string | null> {
-    const details = await this.getCaptchaDetails();
-    if (!details || !details.captchaEnabled) {
-      this.log("captcha disabled");
-      return null;
-    }
-
+  async solveCaptcha(): Promise<string> {
     const t0 = Date.now();
-    const chRes = await this.fetch(details.captchaChallenge);
+    const chRes = await this.fetch(`${this.baseUrl}/captcha-challenge/`);
     if (!chRes.ok) throw new Error(`captcha challenge HTTP ${chRes.status}`);
     const ch = (await chRes.json()) as AltchaChallenge;
 
@@ -203,7 +192,7 @@ export class MunichTerminClient {
     if (number == null) throw new Error("captcha PoW not found within maxnumber");
     this.log(`solved PoW n=${number} in ${Date.now() - t0}ms`);
 
-    const solution = Buffer.from(
+    const payload = Buffer.from(
       JSON.stringify({
         algorithm: ch.algorithm,
         challenge: ch.challenge,
@@ -213,27 +202,22 @@ export class MunichTerminClient {
       }),
     ).toString("base64");
 
-    const vRes = await this.fetch(details.captchaVerify, {
+    const vRes = await this.fetch(`${this.baseUrl}/captcha-verify/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ [this.captchaPayloadKey]: solution }),
+      body: JSON.stringify({ payload }),
     });
-    const vText = await vRes.text();
-    if (!vRes.ok) throw new Error(`captcha verify HTTP ${vRes.status}: ${vText.slice(0, 200)}`);
-
-    let token = vText;
-    try {
-      const parsed = JSON.parse(vText) as {
-        payload?: string;
-        token?: string;
-        captchaToken?: string;
-      };
-      token = parsed.payload || parsed.token || parsed.captchaToken || token;
-    } catch {
-      /* non-JSON: use raw text */
+    const verify = (await vRes.json().catch(() => ({}))) as {
+      token?: string;
+      meta?: { success?: boolean; error?: string };
+    };
+    if (!vRes.ok || !verify.token) {
+      throw new Error(
+        `captcha verify failed: HTTP ${vRes.status} ${verify.meta?.error ?? ""}`.trim(),
+      );
     }
-    this.log("captcha verified, token length", token.length);
-    return token;
+    this.log(`captcha verified in ${Date.now() - t0}ms`);
+    return verify.token;
   }
 
   /** Available days for a service. `days` is null on an unexpected error. */
