@@ -17,16 +17,18 @@ service** (_Notfall-Hilfe Aufenthaltstitel_) every 5 minutes; use the manual
 
 `libs/` holds importable modules, `apps/` holds runnable entry points:
 
-| File                        | Purpose                                                                |
-| --------------------------- | ---------------------------------------------------------------------- |
-| `libs/client.ts`            | `MunichTerminClient` — availability + automatic Altcha captcha solving |
-| `libs/catalog.generated.ts` | Full scraped list of services & offices (do not edit by hand)          |
-| `libs/catalog.ts`           | Derived `ServiceId`/`OfficeId` types + validation helpers              |
-| `libs/watchlist.ts`         | The services to poll — **type-checked against the catalog**            |
-| `apps/check.ts`             | Per-service checker the CI runs; notifies on availability              |
-| `apps/find-service.ts`      | Search the catalog for service/office IDs                              |
-| `apps/matrix.ts`            | Emits the watch-list as JSON for the CI matrix                         |
-| `apps/generate-catalog.ts`  | Re-scrapes `libs/catalog.generated.ts` from the live API               |
+| File                        | Purpose                                                           |
+| --------------------------- | ----------------------------------------------------------------- |
+| `libs/client.ts`            | `MunichTerminClient` — availability requests + per-call logging   |
+| `libs/middleware.ts`        | Injectable request middleware; the Altcha verification lives here |
+| `libs/catalog.generated.ts` | Full scraped list of services & offices (do not edit by hand)     |
+| `libs/catalog.ts`           | Derived `ServiceId`/`OfficeId` types + validation helpers         |
+| `libs/watchlist.ts`         | The services to poll — **type-checked against the catalog**       |
+| `libs/*.test.ts`            | `bun test` unit tests (catalog, middleware, client)               |
+| `apps/check.ts`             | Per-service checker the CI runs; notifies on availability         |
+| `apps/find-service.ts`      | Search the catalog for service/office IDs                         |
+| `apps/matrix.ts`            | Emits the watch-list as JSON for the CI matrix                    |
+| `apps/generate-catalog.ts`  | Re-scrapes `libs/catalog.generated.ts` from the live API          |
 
 ## Adding a service to the watch-list
 
@@ -78,23 +80,33 @@ to pick `all` or a single service. The dropdown options live in the workflow
 ## Captcha-gated services (immigration)
 
 High-demand services (e.g. _Notfall-Hilfe Aufenthaltstitel_) are protected by an
-**Altcha** proof-of-work captcha. The client solves it automatically via the
-public `captcha-challenge` / `captcha-verify` endpoints (solve the proof-of-work,
-exchange it for a token, pass that to `available-days`) — **this works from
-anywhere, no proxy or German egress required.** Services marked `"captcha": true`
-in the watch-list are just documentation; detection is automatic.
+**Altcha** proof-of-work captcha. It is handled by an **injected middleware**
+([`libs/middleware.ts`](./libs/middleware.ts)) that activates only when a service
+answers `captchaMissing`: it solves the proof-of-work via the public
+`captcha-challenge` / `captcha-verify` endpoints, exchanges it for a token, and
+retries — **so it works from anywhere, no proxy or German egress required.**
+Keeping it as middleware keeps the captcha concern out of the core request path
+and makes it easy to swap or disable (`new MunichTerminClient({ middlewares: [] })`).
+Services marked `"captcha": true` in the watch-list are just documentation;
+detection is automatic.
 
 ## Develop
 
 ```bash
 bun install
+bun test                                            # bun's built-in test runner
 bun run typecheck                                   # tsc --noEmit (TypeScript 6)
 bun run format                                      # oxfmt --write .
 SERVICE_ID=1071896 OFFICE_ID=10308174 bun start     # check one service
+DEBUG=1 SERVICE_ID=10339028 OFFICE_ID=10461 bun start   # verbose run (immigration)
 ```
 
-- **CI** (`.github/workflows/ci.yml`) runs oxfmt + typecheck on every non-main
-  branch / PR.
+Every API call is logged (method, URL, status, timing, error body; the captcha
+token is redacted). The logger is injectable — `new MunichTerminClient({ logger: () => {} })`
+silences it.
+
+- **CI** (`.github/workflows/ci.yml`) runs oxfmt + typecheck + `bun test` on every
+  non-main branch / PR.
 - **Claude Code hooks** (`.claude/`) auto-run oxfmt + typecheck on each edit.
 
 Exit codes: `0` none free, `1` slot(s) found, `2` check error. Requires
