@@ -32,8 +32,5 @@ jobs:
           SERVICE_COUNT: ${{ vars.SERVICE_COUNT || '1' }}
           DAYS_AHEAD: ${{ vars.DAYS_AHEAD || '90' }}
           NOT_AFTER: ${{ vars.NOT_AFTER || '' }}
-          # Optional push notifications: set these as repository secrets to enable.
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           # When a slot is found the script exits non-zero -> this run is marked
           # "failed" and GitHub emails you. That failure is the notification.

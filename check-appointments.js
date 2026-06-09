@@ -64,22 +64,6 @@ async function getAvailableDays() {
   throw new Error(`Unexpected API response (HTTP ${res.status}): ${JSON.stringify(body)}`);
 }
 
-async function notifyTelegram(text) {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
-  if (!token || !chatId) return;
-  try {
-    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text, disable_web_page_preview: false }),
-    });
-    console.log(res.ok ? '📨 Telegram notification sent.' : `Telegram error: HTTP ${res.status}`);
-  } catch (e) {
-    console.error('Telegram notification failed:', e.message);
-  }
-}
-
 function appendFile(envVar, text) {
   const file = process.env[envVar];
   if (file) fs.appendFileSync(file, text);
@@ -115,12 +99,6 @@ const writeSummary = (md) => appendFile('GITHUB_STEP_SUMMARY', md + '\n');
   }
 
   const list = relevant.join(', ');
-  const message =
-    `🚨 Munich appointment available!\n\n` +
-    `Service ${SERVICE_ID} @ office ${OFFICE_ID}\n` +
-    `Date(s): ${list}\n\n` +
-    `Book now: ${BOOKING_URL}`;
-
   console.log('🚨 AVAILABLE:', list);
   console.log('👉', BOOKING_URL);
 
@@ -129,7 +107,6 @@ const writeSummary = (md) => appendFile('GITHUB_STEP_SUMMARY', md + '\n');
   writeSummary(
     `### 🚨 Appointments available!\n\n- **Date(s):** ${list}\n- **[Book now →](${BOOKING_URL})**`
   );
-  await notifyTelegram(message);
 
   if (FAIL_WHEN_AVAILABLE) {
     // Non-zero exit -> the scheduled run is marked failed and GitHub emails you.

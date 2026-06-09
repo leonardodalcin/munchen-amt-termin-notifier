@@ -24,9 +24,9 @@ GET https://www48.muenchen.de/buergeransicht/api/citizen/available-days/
 - None free → `404 { "errors": [{ "errorCode": "noAppointmentForThisScope" }] }`
 
 When a slot is found, the script prints the dates + booking link, writes a job
-summary, optionally sends a Telegram message, and **exits non-zero** so the
-Actions run is marked *failed* — which makes **GitHub email you**. A red run
-here is good news: an appointment is available.
+summary, and **exits non-zero** so the Actions run is marked *failed* — which
+makes **GitHub email you**. A red run here is good news: an appointment is
+available.
 
 ## Configuration
 
@@ -50,13 +50,6 @@ vereinbaren**, and read them off the booking URL:
 ```
 terminvereinbarung.html#/services/<SERVICE_ID>/locations/<OFFICE_ID>
 ```
-
-### Optional: Telegram push notifications
-
-Add these repository **Secrets** to also get a Telegram message:
-
-- `TELEGRAM_BOT_TOKEN` — from [@BotFather](https://t.me/BotFather)
-- `TELEGRAM_CHAT_ID` — your chat/user id
 
 ## Run locally
 
