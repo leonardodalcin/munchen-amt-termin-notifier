@@ -3,8 +3,7 @@
   "version": "2.0.0",
   "description": "Checks the City of Munich appointment system (Bürgeransicht / ZMS) for available slots and notifies when they open up.",
   "scripts": {
-    "start": "bun check-appointments.js",
-    "check": "bun check-appointments.js"
+    "start": "bun check-appointments.js"
   },
   "engines": {
     "bun": ">=1.0"
