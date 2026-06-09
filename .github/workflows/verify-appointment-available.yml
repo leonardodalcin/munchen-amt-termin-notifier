@@ -4,8 +4,13 @@ on:
   # Run every 10 minutes.
   schedule:
     - cron: "*/10 * * * *"
-  # Allow manual runs from the Actions tab.
+  # Manual run — optionally target a single service (blank = all).
   workflow_dispatch:
+    inputs:
+      service:
+        description: "Run only this service (name substring or serviceId); blank = all"
+        required: false
+        default: ""
 
 # Avoid overlapping scheduled runs.
 concurrency:
@@ -13,24 +18,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Type-check the TypeScript with tsc before doing anything else.
-  typecheck:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-      - name: Cache Bun packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
-          restore-keys: ${{ runner.os }}-bun-
-      - run: bun install --frozen-lockfile
-      - run: bun run typecheck
-
-  # Load the watch-list (services.json) into a matrix so each service is a job.
+  # Build the matrix from watchlist.ts. Manual runs may filter to one service;
+  # scheduled runs always check the whole watch-list.
   config:
     runs-on: ubuntu-latest
     outputs:
@@ -41,10 +30,12 @@ jobs:
         with:
           bun-version: latest
       - id: load
-        run: echo "matrix=$(bun -e 'process.stdout.write(JSON.stringify(require(\"./services.json\")))')" >> "$GITHUB_OUTPUT"
+        env:
+          SERVICE_FILTER: ${{ github.event.inputs.service }}
+        run: echo "matrix=$(bun apps/matrix.ts "$SERVICE_FILTER")" >> "$GITHUB_OUTPUT"
 
   check:
-    needs: [typecheck, config]
+    needs: config
     runs-on: ubuntu-latest
     strategy:
       # One service finding a slot (and failing) must not cancel the others.
@@ -58,7 +49,7 @@ jobs:
           bun-version: latest
 
       - name: Check ${{ matrix.service.name }}
-        run: bun check.ts
+        run: bun apps/check.ts
         env:
           SERVICE_NAME: ${{ matrix.service.name }}
           SERVICE_ID: ${{ matrix.service.serviceId }}
@@ -69,8 +60,7 @@ jobs:
           # German HTTP(S) proxy — only used for captcha-gated services (the
           # captcha host is only resolvable from inside Germany). Non-captcha
           # services run direct, so they keep working even if the proxy is down.
-          # Set as the repo secret PROXY_URL (see docs/german-proxy.md); it is
-          # passed to the client as MUC_PROXY_URL.
+          # Set as the repo secret PROXY_URL (see docs/german-proxy.md).
           MUC_PROXY_URL: ${{ matrix.service.captcha && secrets.PROXY_URL || '' }}
           # When a slot is found the job exits non-zero -> the run is marked
           # "failed" and GitHub emails you. A red run here is good news.
