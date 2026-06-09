@@ -85,8 +85,11 @@ MUC_PROXY_URL="http://munich:PASS@VPS_IP:8888" \
 
 Repo → **Settings → Secrets and variables → Actions → New repository secret**:
 
-- **Name:** `MUC_PROXY_URL`
+- **Name:** `PROXY_URL`
 - **Value:** `http://munich:PASS@VPS_IP:8888`
+
+(The workflow reads the `PROXY_URL` secret and passes it to the client as
+`MUC_PROXY_URL`.)
 
 That's it. The scheduled workflow now routes captcha-gated services through the
 German proxy; if the secret is missing, those jobs fail with a clear connection
