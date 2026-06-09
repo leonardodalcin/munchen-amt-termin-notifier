@@ -1,16 +1,23 @@
 name: Verify Munich appointment availability
 
 on:
-  # Run every 10 minutes.
+  # Run every 5 minutes.
   schedule:
-    - cron: "*/10 * * * *"
-  # Manual run — optionally target a single service (blank = all).
+    - cron: "*/5 * * * *"
+  # Manual run — pick one service or all.
   workflow_dispatch:
     inputs:
       service:
-        description: "Run only this service (name substring or serviceId); blank = all"
-        required: false
-        default: ""
+        description: "Which service to check"
+        required: true
+        default: all
+        type: choice
+        # Keep options in sync with libs/watchlist.ts (GitHub needs static choices).
+        options:
+          - all
+          - führerschein
+          - einbürgerung
+          - aufenthaltstitel
 
 # Avoid overlapping scheduled runs.
 concurrency:
@@ -31,8 +38,17 @@ jobs:
           bun-version: latest
       - id: load
         env:
-          SERVICE_FILTER: ${{ github.event.inputs.service }}
-        run: echo "matrix=$(bun apps/matrix.ts "$SERVICE_FILTER")" >> "$GITHUB_OUTPUT"
+          INPUT_SERVICE: ${{ github.event.inputs.service }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          # Manual runs must pick a service (the dropdown enforces this; guard anyway).
+          if [ "$EVENT" = "workflow_dispatch" ] && [ -z "$INPUT_SERVICE" ]; then
+            echo "::error::Manual runs require a service selection." >&2
+            exit 1
+          fi
+          # Scheduled runs check only the immigration service; manual runs use the dropdown.
+          FILTER="${INPUT_SERVICE:-aufenthaltstitel}"
+          echo "matrix=$(bun apps/matrix.ts "$FILTER")" >> "$GITHUB_OUTPUT"
 
   check:
     needs: config
@@ -57,10 +73,6 @@ jobs:
           SERVICE_COUNT: ${{ matrix.service.serviceCount || 1 }}
           DAYS_AHEAD: ${{ matrix.service.daysAhead || vars.DAYS_AHEAD || '90' }}
           NOT_AFTER: ${{ matrix.service.notAfter || '' }}
-          # German HTTP(S) proxy — only used for captcha-gated services (the
-          # captcha host is only resolvable from inside Germany). Non-captcha
-          # services run direct, so they keep working even if the proxy is down.
-          # Set as the repo secret PROXY_URL (see docs/german-proxy.md).
-          MUC_PROXY_URL: ${{ matrix.service.captcha && secrets.PROXY_URL || '' }}
           # When a slot is found the job exits non-zero -> the run is marked
           # "failed" and GitHub emails you. A red run here is good news.
+          # (Captcha-gated services are solved automatically — no proxy needed.)

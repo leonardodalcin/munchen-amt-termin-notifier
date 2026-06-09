@@ -5,11 +5,10 @@
  *
  * Required:  SERVICE_ID, OFFICE_ID   (must exist in the catalog)
  * Optional:  SERVICE_NAME, SERVICE_COUNT(=1), DAYS_AHEAD(=90),
- *            NOT_AFTER(YYYY-MM-DD), MUC_PROXY_URL, FAIL_WHEN_AVAILABLE(=true)
+ *            NOT_AFTER(YYYY-MM-DD), FAIL_WHEN_AVAILABLE(=true)
  *
- * Captcha-gated services (e.g. immigration / Aufenthaltstitel) are handled
- * automatically — but the captcha host is only reachable from Germany, so set
- * MUC_PROXY_URL to a German HTTP(S) proxy when running outside Germany.
+ * Captcha-gated services (e.g. immigration / Aufenthaltstitel) are solved
+ * automatically — no proxy or German egress required.
  *
  * Exit codes: 0 = none free, 1 = slot(s) found, 2 = check error.
  */
