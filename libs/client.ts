@@ -5,10 +5,12 @@
  * It can:
  *   - discover services + offices and their IDs (getServices / getOffices /
  *     getOfficesAndServices),
- *   - check available days for any service (getAvailableDays / availableDaysAuto),
+ *   - check available days for any service (availableDays),
  *   - transparently solve the Altcha proof-of-work captcha that gates the
  *     high-demand services (e.g. immigration / Aufenthaltstitel) via the public
  *     www48 challenge/verify endpoints — works from anywhere, no proxy needed.
+ *     Verification is an injected middleware (see middleware.ts); it activates
+ *     only for the services that actually demand it.
  *
  * An optional `proxy` (or MUC_PROXY_URL / HTTPS_PROXY) is still honoured if you
  * want to route requests through one, but it is not required.
@@ -16,14 +18,26 @@
 
 import { createHash } from "node:crypto";
 import type { OfficeId, ServiceId } from "./catalog";
+import {
+  altchaCaptchaMiddleware,
+  type AvailabilityHandler,
+  type AvailabilityMiddleware,
+} from "./middleware";
 
 export const DEFAULT_BASE: string =
   process.env.API_BASE || "https://www48.muenchen.de/buergeransicht/api/citizen";
+
+/** Structured logger; receives one log record per call. */
+export type Logger = (...args: unknown[]) => void;
 
 export interface ClientOptions {
   baseUrl?: string;
   proxy?: string;
   debug?: boolean;
+  /** API-call logger; defaults to stderr. Pass `() => {}` to silence. */
+  logger?: Logger;
+  /** Middlewares wrapping each availability request; defaults to Altcha verification. */
+  middlewares?: AvailabilityMiddleware[];
 }
 
 export interface Service {
@@ -106,24 +120,52 @@ export class MunichTerminClient {
   readonly baseUrl: string;
   readonly proxy: string | undefined;
   readonly debug: boolean;
+  readonly logger: Logger;
+  readonly middlewares: AvailabilityMiddleware[];
 
   constructor(options: ClientOptions = {}) {
     this.baseUrl = (options.baseUrl ?? DEFAULT_BASE).replace(/\/+$/, "");
     this.proxy = options.proxy ?? process.env.MUC_PROXY_URL ?? process.env.HTTPS_PROXY ?? undefined;
     this.debug = options.debug ?? !!process.env.DEBUG;
+    this.logger = options.logger ?? ((...args) => console.error("[muc]", ...args));
+    // Inject Altcha verification by default — it only activates when a service needs it.
+    this.middlewares = options.middlewares ?? [
+      altchaCaptchaMiddleware(() => this.solveCaptcha(), this.logger),
+    ];
   }
 
+  /** Verbose log, only when `debug` is on. */
   private log(...args: unknown[]): void {
-    if (this.debug) console.error("[client]", ...args);
+    if (this.debug) this.logger(...args);
   }
 
-  private fetch(url: string, opts: FetchInit = {}): Promise<Response> {
+  /** Hide the captcha JWT from logged URLs. */
+  private redact(url: string): string {
+    return url.replace(/(captchaToken=)[^&]+/, "$1<redacted>");
+  }
+
+  private async fetch(url: string, opts: FetchInit = {}): Promise<Response> {
     const init: FetchInit = {
       ...opts,
       headers: { Accept: "application/json", ...(opts.headers as Record<string, string>) },
     };
     if (this.proxy) init.proxy = this.proxy;
-    return fetch(url, init);
+
+    const method = init.method ?? "GET";
+    const safeUrl = this.redact(url);
+    const started = Date.now();
+    this.logger(`→ ${method} ${safeUrl}${this.proxy ? " (via proxy)" : ""}`);
+    try {
+      const res = await fetch(url, init);
+      this.logger(
+        `← ${res.status} ${res.statusText} ${method} ${safeUrl} (${Date.now() - started}ms)`,
+      );
+      return res;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger(`✖ ${method} ${safeUrl} failed after ${Date.now() - started}ms: ${message}`);
+      throw error;
+    }
   }
 
   private async json<T>(
@@ -132,6 +174,7 @@ export class MunichTerminClient {
   ): Promise<{ res: Response; body: Partial<T> }> {
     const res = await this.fetch(url, opts);
     const body = (await res.json().catch(() => ({}))) as Partial<T>;
+    if (!res.ok) this.logger(`  response body: ${JSON.stringify(body).slice(0, 300)}`);
     return { res, body };
   }
 
@@ -220,8 +263,8 @@ export class MunichTerminClient {
     return verify.token;
   }
 
-  /** Available days for a service. `days` is null on an unexpected error. */
-  async getAvailableDays(query: AvailableDaysQuery): Promise<AvailableDaysResult> {
+  /** Raw available-days call (no verification). `days` is null on an unexpected error. */
+  private async requestAvailableDays(query: AvailableDaysQuery): Promise<AvailableDaysResult> {
     const params = new URLSearchParams({
       officeId: String(query.officeId),
       serviceId: String(query.serviceId),
@@ -238,20 +281,28 @@ export class MunichTerminClient {
 
     const errors = body.errors ?? [];
     const errorCodes = errors.map((e) => e.errorCode);
-    // 404 + noAppointmentForThisScope is the API's normal "nothing free" answer.
-    if (res.status === 404 || errorCodes.includes("noAppointmentForThisScope")) return { days: [] };
+    // 404 / noAppointmentForThis* is the API's normal "nothing free" answer.
+    if (
+      res.status === 404 ||
+      errorCodes.includes("noAppointmentForThisScope") ||
+      errorCodes.includes("noAppointmentForThisDay")
+    ) {
+      return { days: [] };
+    }
 
     return { days: null, status: res.status, errors, errorCodes };
   }
 
-  /** Like getAvailableDays, but transparently solves the captcha when required. */
-  async availableDaysAuto(query: AvailableDaysQuery): Promise<AvailableDaysResult> {
-    let result = await this.getAvailableDays(query);
-    if (result.days === null && result.errorCodes?.includes("captchaMissing")) {
-      this.log("captcha required — solving…");
-      const captchaToken = await this.solveCaptcha();
-      result = await this.getAvailableDays({ ...query, captchaToken });
-    }
-    return result;
+  /**
+   * Available days for a service, run through the injected middleware chain
+   * (Altcha verification by default, applied only when the service requires it).
+   */
+  async availableDays(query: AvailableDaysQuery): Promise<AvailableDaysResult> {
+    const core: AvailabilityHandler = (q) => this.requestAvailableDays(q);
+    const handler = this.middlewares.reduceRight<AvailabilityHandler>(
+      (next, middleware) => (q) => middleware.handle(q, next),
+      core,
+    );
+    return handler(query);
   }
 }

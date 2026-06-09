@@ -53,7 +53,7 @@ async function main(): Promise<void> {
   );
 
   const client = new MunichTerminClient();
-  const result = await client.availableDaysAuto({
+  const result = await client.availableDays({
     officeId,
     serviceId,
     serviceCount: SERVICE_COUNT,
