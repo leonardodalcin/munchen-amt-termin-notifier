@@ -9,7 +9,7 @@ notifies you when a slot opens up — Führerschein, Einbürgerung, immigration
 Munich uses the Berlin **ZMS ("Bürgeransicht")** system. This project queries its
 JSON API directly with a small, strictly-typed [Bun](https://bun.sh) client — no
 browser, no scraping. A scheduled GitHub Action checks every service in
-[`watchlist.ts`](./libs/watchlist.ts) every 10 minutes (one matrix job each).
+[`watchlist.ts`](./libs/watchlist.ts) every 5 minutes (one matrix job each).
 
 ## Layout
 
@@ -69,9 +69,9 @@ service finding a slot never cancels the others.
 
 ## Running manually
 
-The workflow has a **Run workflow** button (`workflow_dispatch`). Leave the input
-blank to check everything, or enter a service name substring or `serviceId` to
-check just that one.
+The workflow has a **Run workflow** button (`workflow_dispatch`) with a dropdown
+to pick `all` or a single service. The dropdown options live in the workflow
+(GitHub requires static choices) — keep them in sync with `libs/watchlist.ts`.
 
 ## Captcha-gated services (immigration) ⚠️
 

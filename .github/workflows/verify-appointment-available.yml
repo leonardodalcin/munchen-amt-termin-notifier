@@ -1,16 +1,23 @@
 name: Verify Munich appointment availability
 
 on:
-  # Run every 10 minutes.
+  # Run every 5 minutes.
   schedule:
-    - cron: "*/10 * * * *"
-  # Manual run — optionally target a single service (blank = all).
+    - cron: "*/5 * * * *"
+  # Manual run — pick one service or all.
   workflow_dispatch:
     inputs:
       service:
-        description: "Run only this service (name substring or serviceId); blank = all"
-        required: false
-        default: ""
+        description: "Which service to check"
+        required: true
+        default: all
+        type: choice
+        # Keep options in sync with libs/watchlist.ts (GitHub needs static choices).
+        options:
+          - all
+          - führerschein
+          - einbürgerung
+          - aufenthaltstitel
 
 # Avoid overlapping scheduled runs.
 concurrency:
