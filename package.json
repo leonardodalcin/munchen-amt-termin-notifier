@@ -6,6 +6,7 @@
   "scripts": {
     "start": "bun apps/check.ts",
     "find": "bun apps/find-service.ts",
+    "test": "bun test",
     "typecheck": "tsc --noEmit",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
