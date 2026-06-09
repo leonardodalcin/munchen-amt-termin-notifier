@@ -38,15 +38,17 @@ jobs:
           bun-version: latest
       - id: load
         env:
-          SERVICE_FILTER: ${{ github.event.inputs.service }}
+          INPUT_SERVICE: ${{ github.event.inputs.service }}
           EVENT: ${{ github.event_name }}
         run: |
           # Manual runs must pick a service (the dropdown enforces this; guard anyway).
-          if [ "$EVENT" = "workflow_dispatch" ] && [ -z "$SERVICE_FILTER" ]; then
+          if [ "$EVENT" = "workflow_dispatch" ] && [ -z "$INPUT_SERVICE" ]; then
             echo "::error::Manual runs require a service selection." >&2
             exit 1
           fi
-          echo "matrix=$(bun apps/matrix.ts "$SERVICE_FILTER")" >> "$GITHUB_OUTPUT"
+          # Scheduled runs check only the immigration service; manual runs use the dropdown.
+          FILTER="${INPUT_SERVICE:-aufenthaltstitel}"
+          echo "matrix=$(bun apps/matrix.ts "$FILTER")" >> "$GITHUB_OUTPUT"
 
   check:
     needs: config

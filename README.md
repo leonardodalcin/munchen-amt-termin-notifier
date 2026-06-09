@@ -8,8 +8,10 @@ notifies you when a slot opens up — Führerschein, Einbürgerung, immigration
 
 Munich uses the Berlin **ZMS ("Bürgeransicht")** system. This project queries its
 JSON API directly with a small, strictly-typed [Bun](https://bun.sh) client — no
-browser, no scraping. A scheduled GitHub Action checks every service in
-[`watchlist.ts`](./libs/watchlist.ts) every 5 minutes (one matrix job each).
+browser, no scraping. The scheduled GitHub Action checks the **immigration
+service** (_Notfall-Hilfe Aufenthaltstitel_) every 5 minutes; use the manual
+**Run workflow** dropdown to check Führerschein, Einbürgerung, or all of
+[`watchlist.ts`](./libs/watchlist.ts).
 
 ## Layout
 
