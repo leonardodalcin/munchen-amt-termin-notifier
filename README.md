@@ -56,8 +56,8 @@ is verified against `captcha-prod.muenchen.de`, which is **only resolvable from
 inside Germany**. GitHub's runners are outside Germany, so these checks need to
 exit through a **German HTTP(S) proxy**:
 
-1. Stand up a cheap German proxy and add a repository secret **`PROXY_URL`** —
-   step-by-step guide: **[docs/german-proxy.md](./docs/german-proxy.md)**.
+1. Stand up a small German proxy on AWS Lightsail and add a repository secret
+   **`PROXY_URL`** — step-by-step guide: **[docs/german-proxy.md](./docs/german-proxy.md)**.
 2. The workflow passes it to the client *only* for services marked
    `"captcha": true`, which routes their requests through Germany.
 
