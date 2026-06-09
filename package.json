@@ -2,17 +2,21 @@
   "name": "munchen-amt-termin-notifier",
   "version": "3.0.0",
   "description": "Checks the City of Munich appointment system (Bürgeransicht / ZMS) for available slots across multiple services and notifies when they open up.",
+  "license": "CC-BY-4.0",
   "scripts": {
-    "start": "bun check.ts",
-    "find": "bun find-service.ts",
-    "typecheck": "tsc --noEmit"
+    "start": "bun apps/check.ts",
+    "find": "bun apps/find-service.ts",
+    "typecheck": "tsc --noEmit",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check .",
+    "generate:catalog": "bun apps/generate-catalog.ts"
+  },
+  "devDependencies": {
+    "bun-types": "^1.3.14",
+    "oxfmt": "^0.54.0",
+    "typescript": "^6"
   },
   "engines": {
     "bun": ">=1.0"
-  },
-  "license": "MIT",
-  "devDependencies": {
-    "bun-types": "^1.3.14",
-    "typescript": "^6"
   }
 }

@@ -17,6 +17,7 @@
  */
 
 import { createHash } from "node:crypto";
+import type { OfficeId, ServiceId } from "./catalog";
 
 export const DEFAULT_BASE: string =
   process.env.API_BASE || "https://www48.muenchen.de/buergeransicht/api/citizen";
@@ -86,8 +87,8 @@ export interface ApiError {
 }
 
 export interface AvailableDaysQuery {
-  officeId: string | number;
-  serviceId: string | number;
+  officeId: OfficeId;
+  serviceId: ServiceId;
   serviceCount?: string | number;
   startDate: string;
   endDate: string;
@@ -113,8 +114,7 @@ export class MunichTerminClient {
 
   constructor(options: ClientOptions = {}) {
     this.baseUrl = (options.baseUrl ?? DEFAULT_BASE).replace(/\/+$/, "");
-    this.proxy =
-      options.proxy ?? process.env.MUC_PROXY_URL ?? process.env.HTTPS_PROXY ?? undefined;
+    this.proxy = options.proxy ?? process.env.MUC_PROXY_URL ?? process.env.HTTPS_PROXY ?? undefined;
     this.captchaPayloadKey =
       options.captchaPayloadKey ?? process.env.CAPTCHA_PAYLOAD_KEY ?? "payload";
     this.debug = options.debug ?? !!process.env.DEBUG;
@@ -133,7 +133,10 @@ export class MunichTerminClient {
     return fetch(url, init);
   }
 
-  private async json<T>(url: string, opts?: FetchInit): Promise<{ res: Response; body: Partial<T> }> {
+  private async json<T>(
+    url: string,
+    opts?: FetchInit,
+  ): Promise<{ res: Response; body: Partial<T> }> {
     const res = await this.fetch(url, opts);
     const body = (await res.json().catch(() => ({}))) as Partial<T>;
     return { res, body };
@@ -168,7 +171,12 @@ export class MunichTerminClient {
   private solvePow(ch: AltchaChallenge): number | null {
     const max = Number.isFinite(ch.maxnumber) ? (ch.maxnumber as number) : 1_000_000;
     for (let n = 0; n <= max; n++) {
-      if (createHash("sha256").update(ch.salt + n).digest("hex") === ch.challenge) return n;
+      if (
+        createHash("sha256")
+          .update(ch.salt + n)
+          .digest("hex") === ch.challenge
+      )
+        return n;
     }
     return null;
   }
@@ -202,7 +210,7 @@ export class MunichTerminClient {
         number,
         salt: ch.salt,
         signature: ch.signature,
-      })
+      }),
     ).toString("base64");
 
     const vRes = await this.fetch(details.captchaVerify, {
@@ -215,7 +223,11 @@ export class MunichTerminClient {
 
     let token = vText;
     try {
-      const parsed = JSON.parse(vText) as { payload?: string; token?: string; captchaToken?: string };
+      const parsed = JSON.parse(vText) as {
+        payload?: string;
+        token?: string;
+        captchaToken?: string;
+      };
       token = parsed.payload || parsed.token || parsed.captchaToken || token;
     } catch {
       /* non-JSON: use raw text */
@@ -236,7 +248,7 @@ export class MunichTerminClient {
     if (query.captchaToken) params.set("captchaToken", query.captchaToken);
 
     const { res, body } = await this.json<{ availableDays: string[]; errors: ApiError[] }>(
-      `${this.baseUrl}/available-days/?${params}`
+      `${this.baseUrl}/available-days/?${params}`,
     );
     if (Array.isArray(body.availableDays)) return { days: body.availableDays };
 
