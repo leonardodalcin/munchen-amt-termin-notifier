@@ -53,13 +53,16 @@ High-demand services (e.g. *Notfall-Hilfe Aufenthaltstitel*) are protected by an
 **Altcha** proof-of-work captcha. The client solves the proof-of-work
 automatically and runs the challenge → solve → verify flow — **but** the captcha
 is verified against `captcha-prod.muenchen.de`, which is **only resolvable from
-inside Germany**. GitHub's runners are outside Germany, so these checks fail with
-a connection error unless you route traffic through a **German HTTP(S) proxy/VPN**:
+inside Germany**. GitHub's runners are outside Germany, so these checks need to
+exit through a **German HTTP(S) proxy**:
 
-1. Add a repository secret **`MUC_PROXY_URL`** (e.g. `http://user:pass@de-proxy:8080`).
-2. The workflow passes it to the client, which sends all requests through it.
+1. Stand up a cheap German proxy and add a repository secret **`MUC_PROXY_URL`** —
+   step-by-step guide: **[docs/german-proxy.md](./docs/german-proxy.md)**.
+2. The workflow passes it to the client *only* for services marked
+   `"captcha": true`, which routes their requests through Germany.
 
-Non-captcha services (Führerschein, Einbürgerung, …) work without any proxy.
+Non-captcha services (Führerschein, Einbürgerung, …) run direct — no proxy
+needed, and they keep working even if the proxy is down.
 
 ## Run / develop locally
 
