@@ -39,7 +39,14 @@ jobs:
       - id: load
         env:
           SERVICE_FILTER: ${{ github.event.inputs.service }}
-        run: echo "matrix=$(bun apps/matrix.ts "$SERVICE_FILTER")" >> "$GITHUB_OUTPUT"
+          EVENT: ${{ github.event_name }}
+        run: |
+          # Manual runs must pick a service (the dropdown enforces this; guard anyway).
+          if [ "$EVENT" = "workflow_dispatch" ] && [ -z "$SERVICE_FILTER" ]; then
+            echo "::error::Manual runs require a service selection." >&2
+            exit 1
+          fi
+          echo "matrix=$(bun apps/matrix.ts "$SERVICE_FILTER")" >> "$GITHUB_OUTPUT"
 
   check:
     needs: config
