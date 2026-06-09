@@ -12,7 +12,7 @@ Actions.
 ## How it works
 
 A scheduled GitHub Action runs [`check-appointments.js`](./check-appointments.js)
-every 10 minutes. The script calls:
+with [Bun](https://bun.sh) every 10 minutes. The script calls:
 
 ```
 GET https://www48.muenchen.de/buergeransicht/api/citizen/available-days/
@@ -54,9 +54,9 @@ terminvereinbarung.html#/services/<SERVICE_ID>/locations/<OFFICE_ID>
 ## Run locally
 
 ```bash
-npm start                      # uses the defaults
-SERVICE_ID=1071944 npm start   # e.g. "Umschreibung EU/EWR-Führerschein"
+bun start                      # uses the defaults
+SERVICE_ID=1071944 bun start   # e.g. "Umschreibung EU/EWR-Führerschein"
 ```
 
-Requires Node 18+ (uses the built-in `fetch`). Exit codes: `0` none free,
+Requires [Bun](https://bun.sh) (≥1.0). Exit codes: `0` none free,
 `1` slot(s) found, `2` check error.

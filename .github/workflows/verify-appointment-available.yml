@@ -18,12 +18,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          node-version: 20
+          bun-version: latest
 
       - name: Check for available appointments
-        run: npm start
+        run: bun start
         env:
           # Defaults target "Umschreibung eines ausländischen Führerscheins".
           # Override here (or via repo variables) to watch a different service/office.
