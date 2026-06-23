@@ -36,4 +36,5 @@ export const WATCHLIST = [
     officeId: 10461,
     captcha: true,
   },
+  { name: "Verpflichtungserklärung abgeben", serviceId: 1063741, officeId: 10308621 },
 ] as const satisfies readonly WatchEntry[];
