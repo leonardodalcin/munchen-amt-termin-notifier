@@ -18,6 +18,7 @@ on:
           - führerschein
           - einbürgerung
           - aufenthaltstitel
+          - verpflichtungserklärung
 
 # Avoid overlapping scheduled runs.
 concurrency:
@@ -26,7 +27,7 @@ concurrency:
 
 jobs:
   # Build the matrix from watchlist.ts. Manual runs may filter to one service;
-  # scheduled runs always check the whole watch-list.
+  # scheduled runs always check the Verpflichtungserklärung (Schnellschalter) service.
   config:
     runs-on: ubuntu-latest
     outputs:
@@ -46,8 +47,8 @@ jobs:
             echo "::error::Manual runs require a service selection." >&2
             exit 1
           fi
-          # Scheduled runs check only the immigration service; manual runs use the dropdown.
-          FILTER="${INPUT_SERVICE:-aufenthaltstitel}"
+          # Scheduled runs check only the Verpflichtungserklärung service; manual runs use the dropdown.
+          FILTER="${INPUT_SERVICE:-verpflichtungserklärung}"
           echo "matrix=$(bun apps/matrix.ts "$FILTER")" >> "$GITHUB_OUTPUT"
 
   check:
